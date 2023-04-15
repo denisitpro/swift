@@ -2,14 +2,25 @@ import SwiftUI
 
 struct Trade: Identifiable {
     let id = UUID()
-    var ticker: String = ""
+    private var _ticker: String
+    var ticker: String {
+        get { _ticker }
+        set { _ticker = newValue.uppercased() }
+    }
     var tvh: Double = 0.0
     var sl: Double = 0.0
     var risk: Double {
         let risk = (abs(sl / tvh - 1) * 100).rounded(toPlaces: 2)
         return risk
     }
+    
+    init(ticker: String = "not_set", tvh: Double, sl: Double) {
+        self._ticker = ticker.uppercased()
+        self.tvh = tvh
+        self.sl = sl
+    }
 }
+
 
 class TradeStore: ObservableObject {
     @Published var trades: [Trade] = []
@@ -33,7 +44,10 @@ struct TradeListView: View {
                 ForEach(tradeStore.trades) { trade in
                     TradeRowView(trade: trade)
                 }
-                .onDelete(perform: deleteTrade)
+                .onDelete { offsets in
+                    deleteTrade(at: offsets)
+                }
+
             }
             .navigationBarTitle("Trades")
             .navigationBarItems(trailing:
@@ -66,6 +80,7 @@ struct TradeRowView: View {
             }
         }
     }
+    
     func getRiskColor(_ risk: Double) -> Color {
         if risk < 5 {
             return Color.green
@@ -75,21 +90,32 @@ struct TradeRowView: View {
             return Color.red
         }
     }
-
 }
 
 struct AddTradeView: View {
     @EnvironmentObject var tradeStore: TradeStore
     @Environment(\.presentationMode) var presentationMode
     
-    @State private var ticker = ""
+    @State private var ticker = "not_ticker"
     @State private var tvhText = ""
     @State private var slText = ""
     
     var body: some View {
         Form {
             Section(header: Text("Trade Details")) {
-                TextField("Ticker", text: $ticker)
+                ZStack(alignment: .leading) {
+                    if ticker.isEmpty {
+                        Text("Ticker")
+                            .foregroundColor(Color(.systemGray))
+                    }
+                    TextField("", text: $ticker)
+                        .onAppear {
+                            if ticker == "not_ticker" {
+                                ticker = ""
+                            }
+                        }
+                        .foregroundColor(.primary)
+                }
                 TextField("TVH", text: $tvhText)
                     .keyboardType(.decimalPad)
                 TextField("SL", text: $slText)
@@ -97,11 +123,15 @@ struct AddTradeView: View {
             }
             Section {
                 Button("Save") {
-                    guard let tvh = Double(tvhText),
+                    guard !tvhText.isEmpty, !slText.isEmpty,
+                          let tvh = Double(tvhText),
                           let sl = Double(slText) else {
                         return
                     }
-                    let trade = Trade(ticker: ticker, tvh: tvh, sl: sl)
+                    if ticker.isEmpty {
+                        ticker = "HDFS1000"
+                    }
+                    let trade = Trade(ticker: ticker.uppercased(), tvh: tvh, sl: sl)
                     tradeStore.addTrade(trade)
                     presentationMode.wrappedValue.dismiss()
                 }
@@ -110,6 +140,9 @@ struct AddTradeView: View {
         .navigationBarTitle("Add Trade")
     }
 }
+
+
+
 
 struct ContentView: View {
     var body: some View {

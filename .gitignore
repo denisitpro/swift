@@ -6,3 +6,7 @@
 *.log
 *.hui
 .vscode
+# xcode
+*.xcuserstate
+project.xcworkspace/
+xcuserdata/
